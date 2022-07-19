@@ -57,7 +57,7 @@ if (imageFormat !== "svg") {
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 
 async function init () {
-    debug("init");
+    // debug("init");
 
     const osmdTestingMode = mode.includes("osmdtesting"); // can also be --debugosmdtesting
     const osmdTestingSingleMode = mode.includes("osmdtestingsingle");
@@ -270,7 +270,7 @@ async function init () {
         }
     }
 
-    debug("done, exiting.");
+    // debug("done, exiting.");
 }
 
 // eslint-disable-next-line
@@ -370,6 +370,58 @@ async function generateSampleImage (sampleFilename, directory, osmdInstance, osm
         debug("renderError: " + ex);
     }
     debug("rendered", DEBUG);
+
+    var allNotes = []
+    osmdInstance.cursor.reset()
+    const iterator = osmdInstance.cursor.Iterator;
+    var ties = {};
+    while(!iterator.EndReached) {
+        const voices = iterator.CurrentVoiceEntries;
+        for(var i = 0; i < voices.length; i++) {
+            const v = voices[i];
+            const notes = v.Notes;
+            for(var j = 0; j < notes.length; j++) {
+                const note = notes[j];
+                let ctsRealValue = osmdInstance.cursor.iterator.CurrentEnrolledTimestamp.realValue
+                // make sure our note is not silent
+                if (note.tie != undefined) {
+                    let tie = note.tie
+                    if (ties[tie.TieNumber] == undefined) {
+                        ties[tie.TieNumber] = 0
+                    }
+                    ties[tie.TieNumber] = ties[tie.TieNumber]+1
+                    tie.num = ties[tie.TieNumber]
+                    tie.index = note.pitch.halfTone
+                    if (tie.notes.length > 0) {
+                        tie.count = tie.notes.length
+                    }
+                    tie.notes = []
+                    note.tie = tie
+                    // console.log(tie)
+                } else {
+                    note.tie = {}
+                }
+                if (note != null && note.halfTone != 0) {
+                    if (note.isRest()) {
+                        allNotes.push({
+                            length: note.length,
+                            ctsRealValue: ctsRealValue
+                        })
+                    } else {
+                        allNotes.push({
+                            id: note.voiceEntry.parentSourceStaffEntry.parentStaff.id,
+                            tie: note.tie,
+                            pitch: note.pitch,
+                            length: note.length,
+                            ctsRealValue: ctsRealValue
+                        })
+                    }
+                }
+            }
+        }
+        iterator.moveToNext()
+    }
+    console.log(JSON.stringify(allNotes))
 
     const markupStrings = []; // svg
     const dataUrls = []; // png
